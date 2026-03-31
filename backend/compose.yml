@@ -2,9 +2,7 @@ services:
   logistics-service:
     image: logistics-service
     container_name: logistics-service
-    build:
-      context: backend
-      dockerfile: Dockerfile
+    build: .
     environment:
       - DB_ADDRESS=postgres://postgres:password@postgres:5432/logistics?sslmode=disable
       - AUTH_SECRET_KEY=change-me-in-production
