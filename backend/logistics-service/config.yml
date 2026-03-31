@@ -3,7 +3,7 @@ app:
 
 auth:
   secret_key: "change-me-in-production-use-env"
-  ttl_hours: 72
+  ttl_hours: "72h"
   api_key: "internal-api-key"
 
 db:

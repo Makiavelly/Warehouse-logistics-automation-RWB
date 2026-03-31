@@ -43,7 +43,7 @@ services:
     ports:
       - "18888:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@logistics.local
+      PGADMIN_DEFAULT_EMAIL: admin@test.com
       PGADMIN_DEFAULT_PASSWORD: password
       PGADMIN_DISABLE_POSTFIX: "true"
     volumes:

@@ -23,6 +23,26 @@
 - **frontend** — веб-интерфейс (разрабатывается отдельно)
 - **PostgreSQL** — основная БД
 
+устанавливаем admin:
+```docker exec postgres-logistics psql -U postgres -d logistics -c "INSERT INTO users (username, password_hash, role) VALUES ('admin', crypt('admin123', gen_salt('bf')), 'admin');"```
+Подключитесь к БД: docker exec -it postgres-logistics psql -U postgres -d logistics
+
+В Postman посмотреть токен админа:
+POST http://localhost:8080/api/auth/login и в body поставьте {"username":"admin","password":"admin123"}
+В ответе увидите токен админа
+
+Сохраните токен в Authorization Bear Token (Это в Postman) 
+Открыть BD: http://localhost:18888
+
+# из папки backend/
+cd D:\Warehouse-logistics-automation-RWB\backend
+
+# Загрузить обучающие данные (с target_2h)
+go run ./cmd/seed -file ../test_team_track.parquet
+
+# Загрузить тестовые данные
+go run ./cmd/seed -file ../test_team_track.parquet
+
 ### Почему gRPC между backend и ML-сервисом
 
 | | HTTP/REST | gRPC |
@@ -235,3 +255,164 @@ curl -X POST http://localhost:8080/api/data/ingest \
   -H "Content-Type: application/json" \
   -d '{"data_points":[{"route_id":"r1","office_from_id":"WH-001","timestamp":"2026-03-01T12:00:00Z","status_1":10,"target_2h":45}]}'
 ```
+
+
+
+Шаг 0 — Запуск
+
+# В корне проекта D:\Warehouse-logistics-automation-RWB\
+make up
+# или напрямую:
+docker compose up --build -d
+
+Что поднимается:
+- localhost:8080 — Go API (backend)
+- localhost:5432 — PostgreSQL
+- localhost:18888 — pgAdmin (визуальный просмотр БД)
+
+  ---
+Шаг 1 — Авторизация в Postman
+
+Логин
+
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+"username": "admin",
+"password": "admin123"
+}
+В ответ получишь token. Скопируй его — он нужен для всех следующих запросов.
+
+Как использовать токен
+
+В каждом следующем запросе добавляй заголовок:
+Authorization: Bearer <вставь_токен_сюда>
+
+В Postman удобно: вкладка Authorization → Bearer Token → вставить токен.
+
+  ---
+Шаг 2 — Загрузка данных из parquet
+
+cd D:\Warehouse-logistics-automation-RWB\backend
+
+# Сначала обучающие данные (содержат target_2h — нужны ML-модели)
+go run ./cmd/seed -file ../train_team_track.parquet
+
+# Потом тестовые
+go run ./cmd/seed -file ../test_team_track.parquet
+
+После этого данные попадают в таблицу raw_data в PostgreSQL.
+
+  ---
+Шаг 3 — Узнать какие склады и маршруты есть в данных
+
+# Посмотреть уникальные склады из загруженных данных
+docker exec postgres-logistics psql -U postgres -d logistics -c \
+"SELECT DISTINCT office_from_id FROM raw_data ORDER BY office_from_id;"
+
+# Посмотреть уникальные маршруты
+docker exec postgres-logistics psql -U postgres -d logistics -c \
+"SELECT DISTINCT route_id, office_from_id FROM raw_data ORDER BY office_from_id, route_id;"
+
+  ---
+Шаг 4 — Создать склады через API
+
+Для каждого office_from_id из данных создаёшь склад:
+
+POST http://localhost:8080/api/warehouses
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+"name": "Склад 1",
+"office_from_id": "<значение из данных>",
+"address": ""
+}
+
+Получишь id склада — сохрани, он нужен для маршрутов.
+
+Посмотреть все склады:
+GET http://localhost:8080/api/warehouses
+Authorization: Bearer <token>
+
+  ---
+Шаг 5 — Создать маршруты
+
+Для каждого route_id привязываешь его к складу:
+
+POST http://localhost:8080/api/warehouses/<warehouse_id>/routes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+"route_id": "<значение из данных>",
+"name": "Маршрут 1"
+}
+
+  ---
+Шаг 6 — Посмотреть данные в pgAdmin
+
+Открой http://localhost:18888
+
+- Email: admin@logistics.local
+- Password: password
+
+Подключение к серверу:
+- Host: postgres
+- Port: 5432
+- Database: logistics
+- Username: postgres
+- Password: password
+
+Там видно все таблицы: raw_data, warehouses, routes, users и т.д.
+
+  ---
+Шаг 7 — Установить пороги (thresholds)
+
+Порог — при каком прогнозируемом количестве вызывать грузовик:
+
+PUT http://localhost:8080/api/thresholds
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+"warehouse_id": "<id склада>",
+"route_id": "<id маршрута>",
+"value": 10.0
+}
+
+  ---
+Шаг 8 — Прогноз (нужен ML-сервис)
+
+POST http://localhost:8080/api/forecasts/predict
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+"warehouse_id": "<id склада>",
+"route_id": "<id маршрута>",
+"forecast_time": "2024-01-15T10:00:00Z",
+"horizon_hours": 2
+}
+
+▎ ⚠️ Это требует работающего ML-сервиса (ml-service). Сейчас он не запущен — это следующий шаг разработки.
+
+  ---
+Что сейчас работает без ML
+
+┌──────────────────────────────────────┬─────────────────────────┐
+│               Endpoint               │       Что делает        │
+├──────────────────────────────────────┼─────────────────────────┤
+│ POST /api/auth/login                 │ Логин                   │
+├──────────────────────────────────────┼─────────────────────────┤
+│ GET/POST /api/warehouses             │ Склады                  │
+├──────────────────────────────────────┼─────────────────────────┤
+│ GET/POST /api/warehouses/{id}/routes │ Маршруты                │
+├──────────────────────────────────────┼─────────────────────────┤
+│ GET/PUT /api/thresholds              │ Пороги                  │
+├──────────────────────────────────────┼─────────────────────────┤
+│ POST /api/data/ingest                │ Загрузка данных         │
+├──────────────────────────────────────┼─────────────────────────┤
+│ GET /health                          │ Проверка что сервер жив │
+└──────────────────────────────────────┴─────────────────────────┘
