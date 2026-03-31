@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package logistics;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "logistics-service/proto/logistics";
+
+// MLService — gRPC-контракт между logistics-service (Go) и ml-service (Python).
+// Используется для: прогноза отгрузок и запуска дообучения модели.
+service MLService {
+  // Проверка доступности ML-сервиса
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Предсказать количество ёмкостей для (route_id, office_from_id) на заданный горизонт
+  rpc Predict(PredictRequest) returns (PredictReply);
+
+  // Запустить дообучение модели на новых данных
+  rpc Retrain(RetrainRequest) returns (RetrainReply);
+
+  // Получить текущий статус дообучения
+  rpc RetrainStatus(google.protobuf.Empty) returns (RetrainStatusReply);
+}
+
+message PredictRequest {
+  string route_id        = 1; // идентификатор маршрута из датасета
+  string office_from_id  = 2; // идентификатор склада из датасета
+  int64  timestamp_unix  = 3; // момент времени (Unix секунды)
+  int32  horizon_hours   = 4; // горизонт прогноза в часах (обычно 2)
+}
+
+message PredictReply {
+  double predicted_count = 1; // предсказанное кол-во ёмкостей (target_2h)
+}
+
+message RetrainRequest {
+  int64 from_date_unix = 1; // начало диапазона данных (0 = с начала)
+  int64 to_date_unix   = 2; // конец диапазона данных (0 = до конца)
+}
+
+message RetrainReply {
+  string status  = 1; // "started" | "already_running" | "error"
+  string message = 2;
+}
+
+enum RetrainStatus {
+  RETRAIN_STATUS_UNSPECIFIED = 0;
+  RETRAIN_STATUS_IDLE        = 1;
+  RETRAIN_STATUS_RUNNING     = 2;
+}
+
+message RetrainStatusReply {
+  RetrainStatus status     = 1;
+  double        progress   = 2; // 0.0 – 1.0
+  string        message    = 3;
+}

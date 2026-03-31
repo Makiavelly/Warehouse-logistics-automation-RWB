@@ -1,148 +1,36 @@
-# это на редакт
 services:
-  api:
-    image: api:latest
+  logistics-service:
+    image: logistics-service
+    container_name: logistics-service
     build:
-      context: search-services
-      dockerfile: Dockerfile.api
-    container_name: api
-    restart: unless-stopped
+      context: backend
+      dockerfile: Dockerfile
+    environment:
+      - DB_ADDRESS=postgres://postgres:password@postgres:5432/logistics?sslmode=disable
+      - AUTH_SECRET_KEY=change-me-in-production
+      - AUTH_API_KEY=internal-api-key
+      - ML_ADDRESS=http://ml-service:8000
+      - APP_LOG_LEVEL=info
     ports:
-      - 28080:8080
-    volumes:
-      - ./search-services/api/config.yaml:/config.yaml
-    environment:
-      - ADMIN_USER=admin
-      - ADMIN_PASSWORD=password
-      - TOKEN_TTL=2m
-      - API_ADDRESS=:8080
-      - WORDS_ADDRESS=words:8080
-      - UPDATE_ADDRESS=update:8080
-      - SEARCH_ADDRESS=search:8080
-      - SEARCH_CONCURRENCY=10
-      - SEARCH_RATE=100
-    depends_on:
-      - words
-      - update
-      - search
-
-  frontend:
-    image: frontend:latest
-    build:
-      context: search-services
-      dockerfile: Dockerfile.frontend
-    container_name: frontend
-    restart: unless-stopped
-    ports:
-      - 28084:8080
-    volumes:
-      - ./search-services/frontend/config.yaml:/config.yaml
-    environment:
-      - FRONTEND_ADDRESS=:8080
-      - API_ADDRESS=http://api:8080
-      - LOG_LEVEL=DEBUG
-    depends_on:
-      - api
-
-  bot:
-    image: bot:latest
-    build:
-      context: search-services
-      dockerfile: Dockerfile.bot
-    container_name: bot
-    restart: unless-stopped
-    volumes:
-      - ./search-services/bot/config.yaml:/config.yaml
-    environment:
-      - BOT_TOKEN=${BOT_TOKEN}
-      - API_ADDRESS=http://api:8080
-      - LOG_LEVEL=DEBUG
-    depends_on:
-      - api
-
-  words:
-    image: words:latest
-    build:
-      context: search-services
-      dockerfile: Dockerfile.words
-    container_name: words
-    restart: unless-stopped
-    ports:
-      - 28081:8080
-    volumes:
-      - ./search-services/words/config.yaml:/config.yaml
-    environment:
-      - WORDS_ADDRESS=:8080
-
-  update:
-    image: update:latest
-    build:
-      context: search-services
-      dockerfile: Dockerfile.update
-    container_name: update
-    restart: unless-stopped
-    ports:
-      - 28082:8080
-    volumes:
-      - ./search-services/update/config.yaml:/config.yaml
-    environment:
-      - UPDATE_ADDRESS=:8080
-      - DB_ADDRESS=postgres://postgres:password@postgres:5432/postgres
-      - XKCD_URL=https://xkcd.com
-      - XKCD_CONCURRENCY=10
-      - WORDS_ADDRESS=words:8080
-      - BROKER_ADDRESS=nats://nats:4222
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
-      words:
-        condition: service_started
-      nats:
-        condition: service_started
-  search:
-    image: search:latest
-    build:
-      context: search-services
-      dockerfile: Dockerfile.search
-    container_name: search
-    restart: unless-stopped
-    ports:
-      - 28083:8080
-    volumes:
-      - ./search-services/search/config.yaml:/config.yaml
-    environment:
-      - SEARCH_ADDRESS=:8080
-      - INDEX_TTL=24h
-      - DB_ADDRESS=postgres://postgres:password@postgres:5432/postgres
-      - WORDS_ADDRESS=words:8080
-      - BROKER_ADDRESS=nats://nats:4222
-    depends_on:
-      postgres:
-        condition: service_healthy
-      words:
-        condition: service_started
-      nats:
-        condition: service_started
-
-  tests:
-    image: tests:latest
-    build: tests
-    container_name: tests
-    restart: 'no'
-    entrypoint: 'true'
 
   postgres:
-    image: postgres
-    container_name: postgres
+    image: postgres:15
+    container_name: postgres-logistics
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - "5432:5432"
     environment:
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: logistics
+      POSTGRES_USER: postgres
     volumes:
-      - postgres:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD', 'pg_isready']
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logistics"]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -150,25 +38,19 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: pgadmin4
+    container_name: pgadmin-logistics
     restart: unless-stopped
     ports:
-      - '18888:80'
+      - "18888:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@test.com
       PGADMIN_DEFAULT_PASSWORD: password
-      PGADMIN_DISABLE_POSTFIX: 'true'
+      PGADMIN_DISABLE_POSTFIX: "true"
     volumes:
-      - pgadmin:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
       - postgres
 
-  nats:
-    image: nats
-    container_name: nats
-    ports:
-      - '4222:4222'
-
 volumes:
-  postgres:
-  pgadmin:
+  postgres_data:
+  pgadmin_data:
