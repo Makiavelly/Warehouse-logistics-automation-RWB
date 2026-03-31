@@ -1,0 +1,20 @@
+app:
+  log_level: "info"
+
+auth:
+  secret_key: "change-me-in-production-use-env"
+  ttl_hours: "72h"
+  api_key: "internal-api-key"
+
+db:
+  address: "postgres://postgres:password@postgres:5432/logistics?sslmode=disable"
+
+server:
+  address: ":8080"
+  read_timeout: "15s"
+  write_timeout: "15s"
+  max_shutdown_timeout: "10s"
+
+ml:
+  address: "ml-service:50051"
+  use_grpc: true
