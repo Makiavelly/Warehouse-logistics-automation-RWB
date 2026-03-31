@@ -1,4 +1,15 @@
 services:
+  frontend:
+    image: logistics-frontend
+    container_name: logistics-frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - logistics-service
+
   logistics-service:
     image: logistics-service
     container_name: logistics-service

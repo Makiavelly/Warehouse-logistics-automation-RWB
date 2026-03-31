@@ -144,6 +144,8 @@ curl http://localhost:8080/health
 # {"status":"ok"}
 ```
 
+Frontend доступен по адресу `http://localhost:3000`.
+
 ### Переменные окружения (backend)
 
 | Переменная | По умолчанию | Описание |
