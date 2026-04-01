@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"errors"
 	coreErrors "logistics-service/logistics-service/core/errors"
 	"logistics-service/logistics-service/core/ports"
@@ -36,5 +37,5 @@ func isUniqueViolation(err error) bool {
 }
 
 func isNotFound(err error) bool {
-	return err != nil && err.Error() == "sql: no rows in result set"
+	return errors.Is(err, sql.ErrNoRows)
 }
