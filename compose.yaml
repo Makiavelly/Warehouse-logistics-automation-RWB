@@ -5,6 +5,8 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
+    environment:
+      - VITE_PROXY_TARGET=http://logistics-service:8080
     ports:
       - "3000:3000"
     depends_on:
