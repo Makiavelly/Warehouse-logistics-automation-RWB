@@ -22,7 +22,7 @@ type RequestLogin struct {
 
 type RequestRegister struct {
 	Username string `json:"username" validate:"required"`
-	Password string `json:"password" validate:"required,min=6"`
+	Password string `json:"password" validate:"required,min=8,containsany=ABCDEFGHIJKLMNOPQRSTUVWXYZ,containsany=0123456789"`
 	Role     string `json:"role"     validate:"required,oneof=admin driver"`
 }
 

@@ -74,7 +74,7 @@ func run(log *logger.Logger, cfg *config.Config) error {
 	mux := serveMux.NewMux()
 	registerRoutes(log, mux, middleware, jwt, svc, validator)
 
-	loggedMux := middleware.Logging(mux)
+	loggedMux := middleware.Logging(middleware.CORS(mux))
 
 	serv := httpServer.New(cfg.Server.Address, loggedMux, cfg.Server.ReadTimeout, cfg.Server.WriteTimeout)
 	log.Info("server listening", "address", cfg.Server.Address)

@@ -28,11 +28,14 @@ func NewRetrainModelHandler(log ports.Logger, svc ports.Service, _ ports.Validat
 	return func(w http.ResponseWriter, r *http.Request) {
 		// body is optional
 		var req models.RequestRetrainModel
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Debug("retrain: failed to decode optional body", "error", err)
+		}
 
 		resp, err := svc.RetrainModel(r.Context(), req)
 		if err != nil {
-			sendError(log, w, http.StatusServiceUnavailable, "retrain failed: "+err.Error())
+			log.Error("retrain model failed", "error", err)
+			sendError(log, w, http.StatusServiceUnavailable, "retrain failed")
 			return
 		}
 		sendOK(log, w, resp)
