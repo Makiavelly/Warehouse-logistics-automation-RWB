@@ -1,0 +1,54 @@
+services:
+  logistics-service:
+    image: logistics-service
+    container_name: logistics-service
+    build: .
+    environment:
+      - DB_ADDRESS=postgres://postgres:password@postgres:5432/logistics?sslmode=disable
+      - AUTH_SECRET_KEY=change-me-in-production
+      - AUTH_API_KEY=internal-api-key
+      - ML_ADDRESS=http://ml-service:8000
+      - APP_LOG_LEVEL=info
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-logistics
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: logistics
+      POSTGRES_USER: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logistics"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin-logistics
+    restart: unless-stopped
+    ports:
+      - "18888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@logistics.local
+      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_DISABLE_POSTFIX: "true"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  pgadmin_data:
